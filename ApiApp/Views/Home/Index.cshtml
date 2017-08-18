@@ -1,0 +1,217 @@
+﻿<div class="container">
+    <div id="tableBlock" class="col-md-6"></div>
+    <div class="col-md-4" id="editBlock">
+        <form>
+            <input type="hidden" id="UserId" />
+            <div class="form-group">
+                <div class="input-group">
+                    <div class="input-group-addon"><span class="glyphicon glyphicon-user" aria-hidden="true"></span></div>
+                    <input type="text" class="form-control" id="UserName" placeholder="Username">
+                </div>
+            </div>
+            <select class="form-control" id="editSelector"></select>
+            <button type="submit" class="btn btn-default" id="editUser">Save</button>
+        </form>
+    </div>
+    <div class="col-md-4" id="createBlock">
+        <form>
+            <div class="form-group">
+                <div class="input-group">
+                    <div class="input-group-addon"><span class="glyphicon glyphicon-user" aria-hidden="true"></span></div>
+                    <input type="text" class="form-control" id="inputUsername" placeholder="Username">
+                </div>
+            </div>
+            <select class="form-control" id="selector"></select>
+            <button type="submit" class="btn btn-default" id="addUser">Add New User</button>
+        </form>
+    </div>
+</div>
+
+@section scripts
+{
+    <script src="~/Scripts/linq.js" type="text/javascript"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+
+            GetAllUsers();
+
+            $("#editUser").click(function (event) {
+                event.preventDefault();
+                EditUser();
+            });
+
+            $("#addUser").click(function (event) {
+                event.preventDefault();
+                AddUser();
+            });
+
+        });
+
+        //Заполнение выпадающего списка с департаментами
+        function FillSelects(allDeps) {
+            $('#selector').html("");
+            $('#editSelector').html("");
+            for (var i = 0; i < allDeps.length; i++) {
+                $('#selector').append("<option value=" + allDeps[i].Id + "> " + allDeps[i].Title + "</option>");
+                $('#editSelector').append("<option value=" + allDeps[i].Id + "> " + allDeps[i].Title + "</option>");
+            }
+        }
+        // Получение всех пользователей по ajax-запросу
+        function GetAllUsers() {
+
+            $("#createBlock").css('display', 'block');
+            $("#editBlock").css('display', 'none');
+            $.ajax({
+                url: '/api/Users',
+                type: 'GET',
+                dataType: 'json',
+                success: function (data) {
+                    GetAllDep(data);
+                },
+                error: function (x, y, z) {
+                    alert(x + '\n' + y + '\n' + z);
+                }
+            });
+        }
+        //получение всех департаментов
+        function GetAllDep(users) {
+
+            $("#createBlock").css('display', 'block');
+            $("#editBlock").css('display', 'none');
+            $.ajax({
+                url: '/api/Departments',
+                type: 'GET',
+                dataType: 'json',
+                success: function (data) {
+                    FillSelects(data);
+                    WriteResponse(data, users);
+                },
+                error: function (x, y, z) {
+                    alert(x + '\n' + y + '\n' + z);
+                }
+            });
+        }
+
+        // Добавление нового пользователя
+        function AddUser() {
+            // получаем значения для пользователя
+            var user = {
+                UserName: $('#inputUsername').val(),
+                DepartmentId: $('#selector').val()
+            };
+
+            $.ajax({
+                url: '/api/Users/',
+                type: 'POST',
+                data: JSON.stringify(user),
+                contentType: "application/json;charset=utf-8",
+                success: function () {
+                    GetAllUsers();
+                },
+                error: function (x, y, z) {
+                    alert(x + '\n' + y + '\n' + z);
+                }
+            });
+        }
+        // Удаление пользователя
+        function DeleteUser(id) {
+
+            $.ajax({
+                url: '/api/Users/' + id,
+                type: 'DELETE',
+                contentType: "application/json;charset=utf-8",
+                success: function () {
+                    GetAllUsers();
+                },
+                error: function (x, y, z) {
+                    alert(x + '\n' + y + '\n' + z);
+                }
+            });
+        }
+        // редактирование пользователя
+        function EditUser() {
+            var id = $('#UserId').val();
+            // получаем новые значения для пользователя
+            var user = {
+                Id: $('#UserId').val(),
+                UserName: $('#UserName').val(),
+                DepartmentId: $('#editSelector').val()
+            };
+            $.ajax({
+                url: '/api/Users/' + id,
+                type: 'PUT',
+                data: JSON.stringify(user),
+                contentType: "application/json;charset=utf-8",
+                success: function () {
+                    GetAllUsers();
+                },
+                error: function (x, y, z) {
+                    alert(x + '\n' + y + '\n' + z);
+                }
+            });
+        }
+
+        // вывод полученных данных на экран
+        function WriteResponse(deps, users) {
+
+            //LINQ для объединения данных из двух таблиц (с помощью linq.js)
+            var query = Enumerable.From(users)
+            .Join(
+                deps,
+                "u => u.DepartmentId",
+                "d => d.Id",
+                "(u,d) => { Id: u.Id, Username: u.UserName, Department: d.Title }"
+            ).ToArray();
+            //создание таблицы с данными
+            var strResult = "<table id = \"mytable\" class = \"table table-hover\"><th>#</th><th>UserName</th><th>Department</th><th></th><th></th>";
+            $.each(query, function (index, elem) {
+                strResult += "<tr class=\"clickable-row\"><td>" + elem.Id + "</td><td> " + elem.Username + "</td><td>" + elem.Department +
+            "</td><td><a id='editItem' data-item='" + elem.Id + "' onclick='EditItem(this);' >Edit</a></td>" +
+            "<td><a id='delItem' data-item='" + elem.Id + "' onclick='DeleteItem(this);' >Delete</a></td></tr>";
+            });
+            strResult += "</table>";
+            $("#tableBlock").html(strResult);
+
+        }
+
+        // обработчик удаления
+        function DeleteItem(el) {
+            // получаем id удаляемого объекта
+            var id = $(el).attr('data-item');
+            DeleteUser(id);
+        }
+        // обработчик редактирования
+        function EditItem(el) {
+            // получаем id редактируемого объекта
+            var id = $(el).attr('data-item');
+            GetUser(id);
+        }
+        // вывод данных пользователя в поля для редактирования
+        function ShowUser(user) {
+            if (user != null) {
+                $("#createBlock").css('display', 'none');
+                $("#editBlock").css('display', 'block');
+                $("#UserId").val(user.Id);
+                $("#UserName").val(user.UserName);
+                $('#editSelector').val(user.DepartmentId);
+            }
+            else {
+                alert("Такого пользователя не существует");
+            }
+        }
+        // запрос пользователя на редактирование
+        function GetUser(id) {
+            $.ajax({
+                url: '/api/Users/' + id,
+                type: 'GET',
+                dataType: 'json',
+                success: function (data) {
+                    ShowUser(data);
+                },
+                error: function (x, y, z) {
+                    alert(x + '\n' + y + '\n' + z);
+                }
+            });
+        }
+    </script>
+}
