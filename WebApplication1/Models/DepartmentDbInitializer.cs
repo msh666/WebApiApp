@@ -2,7 +2,7 @@
 
 namespace WebApplication1.Models
 {
-    public class DepartmentDbInitializer : DropCreateDatabaseAlways<DepartmentContext>
+    public class DepartmentDbInitializer : CreateDatabaseIfNotExists<DepartmentContext>
     {
         protected override void Seed(DepartmentContext db)
         {
